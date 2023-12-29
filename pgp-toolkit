@@ -1,0 +1,36 @@
+#!/bin/bash
+
+# Check if the required arguments are provided
+if [ "$#" -lt 4 ]; then
+    echo "Usage: $0 <-e or -d> <private_key_file> <input_file> <output_file>"
+    exit 1
+fi
+
+operation="$1"
+private_key_file="$2"
+input_file="$3"
+output_file="$4"
+
+# Function to import private key and clean up afterwards
+import_private_key() {
+    gpg --import "$private_key_file"  # Import the private key
+    key_id=$(gpg --list-packets "$private_key_file" | awk '/keyid:/ {print $2; exit}' | tail -c 9)
+    trap 'gpg --batch --yes --delete-secret-keys "$key_id"' EXIT
+}
+
+# Encrypt the file using PGP
+if [ "$operation" == "-e" ]; then
+    import_private_key
+    gpg --output "$output_file" --encrypt --recipient "$key_id" "$input_file"
+    echo "Encryption complete. Output saved to $output_file"
+
+# Decrypt the file using PGP
+elif [ "$operation" == "-d" ]; then
+    import_private_key
+    gpg --output "$output_file" --decrypt "$input_file"
+    echo "Decryption complete. Output saved to $output_file"
+
+else
+    echo "Invalid operation. Use -e for encryption or -d for decryption."
+    exit 1
+fi
